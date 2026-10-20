@@ -1,0 +1,16 @@
+{
+  "name": "session-manager",
+  "version": "0.1.0",
+  "description": "A pane to list, filter, preview, rename and delete Claude Code sessions, backed by claude-sessions.py",
+  "author": { "name": "Alberto Griggio" },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "python": {
+      "type": "string",
+      "title": "Python interpreter",
+      "description": "The Python 3.9+ executable that runs claude-sessions.py",
+      "default": "python3"
+    }
+  }
+}

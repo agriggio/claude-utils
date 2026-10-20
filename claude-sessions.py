@@ -392,11 +392,15 @@ def transcript_excerpt(s, limit=12000):
     return text
 
 
+def ai_prompt(s):
+    return ("Summarize this Claude Code session in 3-4 short lines: what "
+            "the user wanted, what was done, and the current state. "
+            "No preamble.\n\n"
+            + transcript_excerpt(s))
+
+
 def ai_summary(s):
-    prompt = ("Summarize this Claude Code session in 3-4 short lines: what "
-              "the user wanted, what was done, and the current state. "
-              "No preamble.\n\n"
-              + transcript_excerpt(s))
+    prompt = ai_prompt(s)
     try:
         r = subprocess.run(["claude", "-p", "--model", "haiku", prompt],
                            capture_output=True, text=True, timeout=120, cwd="/")
@@ -515,6 +519,12 @@ def cmd_delete(args, sessions, _):
 
 def cmd_preview(args, sessions, _):
     s = resolve_one(sessions, args.session)
+    if args.json:
+        json.dump({"id": s.id, "title": s.title, "running": s.running,
+                   "summary": summary_lines(s), "ai_prompt": ai_prompt(s)},
+                  sys.stdout, indent=2, ensure_ascii=False)
+        print()
+        return
     print("\n".join(summary_lines(s)))
     if args.ai:
         print("\nAI summary:")
@@ -941,6 +951,9 @@ def build_parser():
     p.add_argument("--ai", action="store_true",
                    help="also ask `claude -p` (haiku) for a summary; sends the "
                         "transcript to the API")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable output: the summary lines and the "
+                        "prompt --ai would send")
     p.set_defaults(func=cmd_preview)
 
     p = sub.add_parser("ui", parents=[scope],
