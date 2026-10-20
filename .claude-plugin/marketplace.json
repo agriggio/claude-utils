@@ -1,0 +1,6 @@
+{
+  "name": "claude-utils",
+  "description": "Small utilities for Claude Code",
+  "owner": { "name": "Alberto Griggio" },
+  "plugins": [{ "name": "session-manager", "source": "./" }]
+}

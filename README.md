@@ -6,6 +6,7 @@ A collection of small, dependency-free command-line utilities for working with
 | Tool | Description |
 | --- | --- |
 | [`claude-sessions.py`](#claude-sessionspy) | list, rename, delete and preview sessions, from the CLI or a curses UI |
+| [`session-manager` mod](#session-manager-mod) | the same, as a pane inside Claude Code (`/sessions`) |
 
 More tools may be added over time. Each one is a single standalone script that
 only needs Python 3.9+ and the standard library.
@@ -86,7 +87,7 @@ claude-sessions.py [-g | -p PATH|NAME] [--sort KEY] [COMMAND]
 | `list` (`ls`) | list sessions; `-n N`, `--sort`, `--json`, `--color auto\|always\|never` |
 | `rename` (`mv`) `ID TITLE...` | rename a session |
 | `delete` (`rm`) `ID...` | delete sessions; `-y` skips confirmation, `-n` is a dry run, `--force` allows deleting running sessions |
-| `preview` (`show`) `ID` | short summary; `--ai` adds an AI summary via `claude -p --model haiku` (this sends the transcript to the API; needs the `claude` CLI on your `PATH`) |
+| `preview` (`show`) `ID` | short summary; `--json` for machine-readable output; `--ai` adds an AI summary via `claude -p --model haiku` (this sends the transcript to the API; needs the `claude` CLI on your `PATH`) |
 
 `ID` is a session id, a unique id prefix, or an exact title.
 
@@ -126,6 +127,64 @@ claude-sessions.py show 4a7814e4 --ai
 - Deleting a session is permanent.
 - Renaming a session that is currently running may be overwritten by that
   session.
+
+## session-manager mod
+
+`claude-sessions.py` packaged as a Claude Code
+[mod](https://code.claude.com/docs/en/plugins/mods/overview): a `/sessions`
+command opens a pane beside the chat where you can browse, filter, sort,
+preview, rename and delete sessions without leaving Claude Code. It works in
+the terminal and in the desktop and IDE apps; on mobile the pane is read-only
+apart from its buttons (no filter or rename field).
+
+The mod is a thin front end: every listing, rename and delete is done by
+running `claude-sessions.py` (shipped with the mod), so it behaves exactly
+like the CLI, including protecting running sessions. It needs Python 3.9+ on
+your `PATH` as `python3`; set the plugin's `python` option to use another
+interpreter.
+
+### Installation
+
+At the prompt of a Claude Code terminal session:
+
+```
+/plugin install session-manager --marketplace agriggio/claude-utils
+```
+
+answer `y` to add the marketplace, then pick a scope. From a shell:
+
+```sh
+claude plugin install session-manager --marketplace agriggio/claude-utils
+```
+
+In the desktop app, where `/plugin` does not run: click + next to the prompt
+box, then Plugins, Add marketplace with `agriggio/claude-utils`, then Add
+plugin.
+
+To try it from a checkout instead: `claude --plugin-dir /path/to/claude-utils`.
+
+### Using the pane
+
+Run `/sessions`. The pane opens on the current project's sessions.
+
+- **List**: type in *Filter* (space-separated terms, matched against title,
+  project and id), pick a *Sort* order, toggle *This project* / *All
+  projects* (`t`), *Reload* (`r`). `●` marks running sessions, `*` marked
+  ones. Click or press Enter on a session to open it.
+- **Session**: shows the same summary as `claude-sessions.py show`. *Rename*
+  with the field, *Mark* (`m`) for bulk delete, *AI summary* (`a`), *Delete*
+  (`d`, after confirmation), *Back* (`b`). The session you are in cannot be
+  deleted.
+- **AI summary** uses the session's own model client (Haiku) instead of
+  shelling out to `claude -p`; it sends a condensed transcript to the API.
+- With sessions marked, the list shows *Delete N marked*.
+
+### Development
+
+The repository root is the plugin: `.claude-plugin/plugin.json`,
+`hooks/register.tsx` (the hooks module), `types/index.d.ts` (its state
+contract) and `tests/`. `claude plugin validate .` checks it and
+`claude plugin test .` runs the tests.
 
 ## License
 
