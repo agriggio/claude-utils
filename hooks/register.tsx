@@ -19,6 +19,8 @@ const sort = atom({ plugin: 'session-manager', key: 'sort' } as const, 'modified
 const marked = atom({ plugin: 'session-manager', key: 'marked' } as const, [])
 const view = atom({ plugin: 'session-manager', key: 'view' } as const, { kind: 'list' })
 const message = atom({ plugin: 'session-manager', key: 'message' } as const, '')
+// The session row the focus ring is on, for the list's mark and delete hotkeys.
+const focused = atom({ plugin: 'session-manager', key: 'focused' } as const, '')
 
 const SORTS: { value: SessionsSort; label: string }[] = [
   { value: 'modified', label: 'last modified' },
@@ -46,6 +48,12 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'sessions' }, async $ => {
     await openPane($)
     return { text: 'Sessions pane opened.' }
+  })
+
+  on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+    const id = e.element
+    if (id && (await read($, rows)).some(s => s.id === id)) await update($, focused, () => id)
+    return next(e)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -124,17 +132,10 @@ export const register: Register = (on, options) => {
     }
 
     const query = await read($, filter)
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
     const order = await read($, sort)
     const marks = await read($, marked)
     const global = await read($, isGlobal)
-    const shown = sorted(
-      list.filter(s => {
-        const hay = `${s.title} ${s.project} ${s.id}`.toLowerCase()
-        return terms.every(t => hay.includes(t))
-      }),
-      order,
-    )
+    const shown = visible(list, query, order)
     const width = e.props.bodyColumns ?? 60
 
     return (
@@ -165,6 +166,18 @@ export const register: Register = (on, options) => {
           <Button key="reload" hotkey="r" onPress={() => void reload($)}>
             Reload
           </Button>
+          <Button key="prev-row" hotkey="k" onPress={() => void moveFocus($, -1)}>
+            Up
+          </Button>
+          <Button key="next-row" hotkey="j" onPress={() => void moveFocus($, 1)}>
+            Down
+          </Button>
+          <Button key="mark-row" hotkey="m" onPress={() => void markFocused($)}>
+            Mark
+          </Button>
+          <Button key="delete-row" hotkey="d" onPress={() => void deleteFocused($)}>
+            Delete
+          </Button>
           {marks.length > 0 && (
             <Button key="delete-marked" onPress={() => void goto($, { kind: 'delete', ids: marks })}>
               Delete {String(marks.length)} marked
@@ -175,8 +188,13 @@ export const register: Register = (on, options) => {
         <Text dimColor>
           {String(shown.length)} of {String(list.length)} session(s); ● running, * marked
         </Text>
-        {shown.map(s => (
-          <Button key={s.id} plain onPress={() => void show($, s.id)}>
+        {shown.map((s, i) => (
+          <Button
+            key={s.id}
+            plain
+            autoFocus={i === 0 ? true : undefined}
+            onPress={() => void show($, s.id)}
+          >
             {s.running ? '● ' : '  '}
             {marks.includes(s.id) ? '* ' : '  '}
             {clip(s.title, Math.max(10, width - 30))}
@@ -226,7 +244,7 @@ async function goto($: $, next: SessionsView) {
 async function openPane($: $) {
   await say($, '')
   await goto($, { kind: 'list' })
-  await $.ui.open({ id: PANE, title: TITLE })
+  await $.ui.open({ id: PANE, title: TITLE, focus: true })
   await reload($)
 }
 
@@ -238,6 +256,53 @@ async function toggleScope($: $) {
 
 async function toggle($: $, id: string) {
   await update($, marked, m => (m.includes(id) ? m.filter(x => x !== id) : [...m, id]))
+}
+
+// The sessions the list shows, in order: filtered by the query, then sorted.
+async function shownRows($: $) {
+  return visible(await read($, rows), await read($, filter), await read($, sort))
+}
+
+// Moves the focus ring to the next (1) or previous (-1) session in the list,
+// as the arrow keys do not step through the rows.
+async function moveFocus($: $, by: 1 | -1) {
+  const shown = await shownRows($)
+  if (shown.length === 0) return
+  const here = await read($, focused)
+  const at = shown.findIndex(s => s.id === here)
+  const last = shown.length - 1
+  const to = at < 0 ? (by > 0 ? 0 : last) : Math.min(last, Math.max(0, at + by))
+  try {
+    const r = await $.ui.focus({ requestId: PANE, key: shown[to].id })
+    if (r.deny) return say($, r.deny)
+  } catch (x) {
+    return say($, `cannot move the focus: ${String(x)}`)
+  }
+  await update($, focused, () => shown[to].id)
+}
+
+// The session under the focus ring, if it is still listed.
+async function focusedRow($: $) {
+  const id = await read($, focused)
+  return (await read($, rows)).find(s => s.id === id)
+}
+
+async function markFocused($: $) {
+  const s = await focusedRow($)
+  if (!s) return say($, 'Move to a session first (Tab or the arrow keys).')
+  await say($, '')
+  await toggle($, s.id)
+}
+
+// Deletes the marked sessions, or the one under the focus ring.
+async function deleteFocused($: $) {
+  const marks = await read($, marked)
+  if (marks.length > 0) return goto($, { kind: 'delete', ids: marks })
+  const s = await focusedRow($)
+  if (!s) return say($, 'Move to a session first (Tab or the arrow keys).')
+  if (s.id === (await $.session.id())) return say($, 'The current session cannot be deleted.')
+  await say($, '')
+  await goto($, { kind: 'delete', ids: [s.id] })
 }
 
 async function show($: $, id: string) {
@@ -272,6 +337,17 @@ async function remove($: $, ids: string[]) {
   await say($, r.ok ? `Deleted ${ids.length} session(s).` : r.error || 'delete failed')
   await goto($, { kind: 'list' })
   await reload($)
+}
+
+function visible(list: SessionRow[], query: string, key: SessionsSort) {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
+  return sorted(
+    list.filter(s => {
+      const hay = `${s.title} ${s.project} ${s.id}`.toLowerCase()
+      return terms.every(t => hay.includes(t))
+    }),
+    key,
+  )
 }
 
 function sorted(list: SessionRow[], key: SessionsSort) {

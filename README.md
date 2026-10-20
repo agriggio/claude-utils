@@ -165,12 +165,19 @@ To try it from a checkout instead: `claude --plugin-dir /path/to/claude-utils`.
 
 ### Using the pane
 
-Run `/sessions`. The pane opens on the current project's sessions.
+Run `/sessions`. The pane opens on the current project's sessions and takes
+the keyboard: `j` / `k` (or `Tab`) move down / up through the sessions,
+`Enter` opens the highlighted one, and the other hotkeys below work. `Tab`
+also reaches the filter, sort and scope controls. The arrow keys do not step
+through the list. `Esc` returns the focus to the prompt; press `ctrl+x` then
+`tab` (the default focus chord) or click the pane to give it back.
 
 - **List**: type in *Filter* (space-separated terms, matched against title,
   project and id), pick a *Sort* order, toggle *This project* / *All
   projects* (`t`), *Reload* (`r`). `●` marks running sessions, `*` marked
-  ones. Click or press Enter on a session to open it.
+  ones. Click a session, or move to it and press Enter, to open it. With
+  the focus on a session, `m` marks or unmarks it and `d` deletes it (or all
+  marked ones), after confirmation.
 - **Session**: shows the same summary as `claude-sessions.py show`. *Rename*
   with the field, *Mark* (`m`) for bulk delete, *AI summary* (`a`), *Delete*
   (`d`, after confirmation), *Back* (`b`). The session you are in cannot be

@@ -31,6 +31,7 @@ declare module 'claude-code' {
       marked: string[]
       view: SessionsView
       message: string
+      focused: string
     }
   }
 }

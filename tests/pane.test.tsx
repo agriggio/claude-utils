@@ -107,6 +107,31 @@ test('marks several sessions and deletes them together', async ($, on) => {
   await ui.unmount()
 })
 
+test('list hotkeys need a session under the focus ring', async ($, on) => {
+  const calls: string[][] = []
+  engine(on, calls)
+  await $.session.start({ cwd: '/work/app', surface: 'terminal', isInteractive: true })
+  await $.command.run(SESSIONS)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  await ui.press({ key: 'mark-row' })
+  expect(await ui.find({ type: 'Text', text: /Move to a session first/ })).toBeDefined()
+  await ui.press({ key: 'delete-row' })
+  expect(await ui.find({ key: 'confirm' })).toBeUndefined()
+  expect(calls.some(c => c[0] === 'delete')).toBe(false)
+  await ui.unmount()
+})
+
+test('the list offers j and k to step through the sessions', async ($, on) => {
+  engine(on, [])
+  await $.session.start({ cwd: '/work/app', surface: 'terminal', isInteractive: true })
+  await $.command.run(SESSIONS)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ key: 'next-row' })).toBeDefined()
+  expect(await ui.find({ key: 'prev-row' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('the current session cannot be deleted from the pane', async ($, on) => {
   const calls: string[][] = []
   engine(on, calls, 'aaaaaaaa-1111')
